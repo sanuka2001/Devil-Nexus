@@ -1,0 +1,19 @@
+{
+  "name": "bot-phoenix",
+  "version": "1.0.0",
+  "description": "is a WhatsApp bot developed using Node.js, designed to streamline automated interactions on WhatsApp. It leverages the Baileys library to handle messaging functionalities, including receiving messages and responding within specified timeframes. This project aims to simplify user engagement on WhatsApp through automated responses, custom command handling, and a user-friendly setup, with a focus on flexibility and adaptability to various chat automation needs.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.9",
+    "fs": "^0.0.1-security",
+    "path": "^0.12.7",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
