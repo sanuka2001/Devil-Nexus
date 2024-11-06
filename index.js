@@ -1,81 +1,62 @@
 const makeWASocket = require('@whiskeysockets/baileys').default;
 const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const qrcode = require('qrcode-terminal');
+const express = require('express');
 const fs = require('fs');
 require('dotenv').config(); // Load environment variables from .env file
 
-// Define prefix and adminJIDs
 const prefix = '.';
-const audioMessagePath = './audio/a.mp3'; // Path to your audio file
-
-// List of authorized JIDs
-const linkedJIDs = ['+94768902513@c.us'];  // Example: Add your actual linked user JIDs
+const audioMessagePath = './audio/a.mp3';
+const linkedJIDs = ['+94768902513@c.us'];
 
 let cooldowns = new Map(); // Track cooldowns for chats
+
+// Initialize Express
+const app = express();
+let qrCodeImage; // Store the QR code image temporarily
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true,  // Print QR code in Railway logs for scanning
+        printQRInTerminal: true,
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('messages.upsert', async (m) => {
-        const msg = m.messages[0];
-
-        // Ignore messages from the bot or without content
-        if (msg.key.fromMe || !msg.message) return;
-
-        const chatId = msg.key.remoteJid;
-        const senderJID = msg.key.from;
-        const messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
-
-        console.log(`Received message: "${messageContent}" from ${chatId}`);
-
-        // Check if cooldown mode is active
-        if (cooldowns.has(chatId)) {
-            console.log(`Message from ${chatId} ignored due to cooldown.`);
-            return;
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, qr } = update;
+        
+        if (qr) {
+            qrCodeImage = await generateQRCode(qr);  // Generate the QR code image
+            console.log('QR code updated for web access.');
         }
 
-        // Process command if message starts with the prefix
-        if (messageContent.startsWith(prefix)) {
-            const command = messageContent.slice(prefix.length).split(' ')[0];
-            switch (command) {
-                case 'disable':
-                    await handleDisableCommand(chatId, messageContent, sock, senderJID);
-                    break;
-                case 'status':
-                    await sock.sendMessage(chatId, { text: 'Status: Bot is active!' });
-                    break;
-                default:
-                    await sock.sendMessage(chatId, { text: 'Command not recognized.' });
-                    break;
-            }
-        } else {
-            // Send audio message for regular chats
-            try {
-                await sock.sendMessage(chatId, {
-                    audio: { url: audioMessagePath },
-                    mimetype: 'audio/mpeg',
-                    ptt: true,
-                });
-                sock.sendReadReceipt(chatId, msg.key.id);  // Mark as read
-            } catch (err) {
-                console.error('Failed to send audio message:', err);
-            }
-        }
-    });
-
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
-        if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== 401) {
-            console.log('Reconnecting...');
+        if (connection === 'close') {
+            console.log('Connection closed. Attempting to reconnect...');
             startBot();
         } else if (connection === 'open') {
             console.log('Connection established!');
+        }
+    });
+
+    sock.ev.on('messages.upsert', async (m) => {
+        const msg = m.messages[0];
+        if (msg.key.fromMe || !msg.message) return;
+
+        const chatId = msg.key.remoteJid;
+        const messageContent = msg.message.conversation || "";
+
+        if (cooldowns.has(chatId)) return;
+
+        if (messageContent.startsWith(prefix)) {
+            const command = messageContent.slice(prefix.length).split(' ')[0];
+            if (command === 'disable') {
+                await handleDisableCommand(chatId, messageContent, sock, msg.key.from);
+            }
+        } else {
+            await sendAudioMessage(chatId, sock);
         }
     });
 
@@ -83,37 +64,41 @@ async function startBot() {
     process.on('unhandledRejection', (reason, promise) => console.error('Unhandled rejection at:', promise, 'reason:', reason));
 }
 
-// Handle .disable command
-async function handleDisableCommand(chatId, messageContent, sock, senderJID) {
-    console.log(`Command .disable received from ${chatId}`);
+async function generateQRCode(qr) {
+    return new Promise((resolve, reject) => {
+        qrcode.toDataURL(qr, (err, url) => {
+            if (err) reject(err);
+            resolve(url);
+        });
+    });
+}
 
-    // Ensure sender is authorized
-    if (!linkedJIDs.includes(senderJID)) {
-        await sock.sendMessage(chatId, { text: 'Unauthorized command.' });
-        return;
-    }
-
-    const args = messageContent.split(' ');
-    if (args.length === 2) {
-        const minutes = parseInt(args[1], 10);
-        if (!isNaN(minutes) && minutes > 0) {
-            const cooldownTime = minutes * 60 * 1000; // Convert minutes to milliseconds
-            cooldowns.set(chatId, Date.now() + cooldownTime);
-            await sock.sendMessage(chatId, { text: `Cooldown activated for ${minutes} minutes.` });
-
-            // Remove cooldown after the specified time
-            setTimeout(() => {
-                cooldowns.delete(chatId);
-                sock.sendMessage(chatId, { text: 'Cooldown period ended. Messages can be sent again.' });
-            }, cooldownTime);
-            console.log(`Cooldown activated for ${chatId} for ${minutes} minutes.`);
-        } else {
-            await sock.sendMessage(chatId, { text: 'Specify a valid number of minutes.' });
-        }
-    } else {
-        await sock.sendMessage(chatId, { text: 'Usage: .disable <minutes>' });
+async function sendAudioMessage(chatId, sock) {
+    try {
+        await sock.sendMessage(chatId, {
+            audio: { url: audioMessagePath },
+            mimetype: 'audio/mpeg',
+            ptt: true,
+        });
+    } catch (err) {
+        console.error('Failed to send audio message:', err);
     }
 }
+
+// Express route to serve the QR code
+app.get('/qr', (req, res) => {
+    if (qrCodeImage) {
+        res.send(`<img src="${qrCodeImage}" alt="QR Code for WhatsApp Login">`);
+    } else {
+        res.send('QR code not yet generated. Please refresh shortly.');
+    }
+});
+
+// Start the Express server on the port Railway assigns
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`QR code server running at http://localhost:${PORT}/qr`);
+});
 
 // Start the bot
 startBot();
