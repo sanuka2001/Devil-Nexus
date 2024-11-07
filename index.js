@@ -6,7 +6,7 @@ const fs = require('fs');
 require('dotenv').config(); // Load environment variables from .env file
 
 const prefix = '.';
-const audioMessagePath = './audio/a.mp3';
+const audioMessagePath = './audio/a.MP3';
 const linkedJIDs = ['+94768902513@c.us'];
 
 let cooldowns = new Map(); // Track cooldowns for chats
