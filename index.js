@@ -1,6 +1,6 @@
 const makeWASocket = require('@whiskeysockets/baileys').default;
 const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode'); // Use the correct qrcode package for generating images
 const express = require('express');
 const fs = require('fs');
 require('dotenv').config(); // Load environment variables from .env file
