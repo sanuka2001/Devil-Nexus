@@ -2,71 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const makeWASocket = require('@whiskeysockets/baileys').default;
 const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const axios = require('axios');
-const he = require('he'); // For decoding HTML entities
-const { log } = require('util');
-const { exec } = require('child_process');
+const express = require('express');
+const qrcode = require('qrcode'); // QR කේත නිර්මාණය සඳහා
 
-const serviceName = process.env.SERVICE_NAME;
+const sessionId = 'session_001'; // සෙෂන් සඳහා තනි අංකය
+const app = express();
+const port = 3000; // සේවාදායකය ධාවනය වන පෝට්
 
-console.log(`Detected service name: ${serviceName}`);
-const sessionId = 'session_001'; // Unique session ID for each instance
-const settingsFilePath = 'botSettings.json'; // Path to the settings file
+// QR කේත URL එක හඳුනාගැනීම සඳහා
+let qrCodeURL = ''; 
 
-// Default bot settings
-let botSettings = {
-    PREFIX: '.',
-    unsplashEnabled: true,
-    imgEnabled: true,
-    fbEnabled: true,
-    ALLOW_GROUP_MESSAGES: true,
-    ALLOW_PRIVATE_MESSAGES: true,
-};
-
-// API Keys
-const unsplashapiKey = 'PDaZYHRrWOw5RNJ0O-1n0Xvp2S15-2bH8Ry72tBepGc'; // Replace with your Unsplash API key
-const googleapiKey = 'AIzaSyBznfHRtfx21rP85fWvqntUYCUiWzKfz64'; // Replace with your Google API key
-const cseId = 'f486bc06ae2564183'; // Custom Search Engine ID
-
-// Load settings from the file if it exists
-try {
-    if (fs.existsSync(settingsFilePath)) {
-        const data = fs.readFileSync(settingsFilePath, 'utf8');
-        botSettings = { ...botSettings, ...JSON.parse(data) }; // Merge default and loaded settings
-        console.log('Bot settings successfully loaded from file.');
-    } else {
-        console.warn(`Settings file "${settingsFilePath}" not found. Using default settings.`);
-        // Optionally, save the default settings to the file
-        fs.writeFileSync(settingsFilePath, JSON.stringify(botSettings, null, 4));
-        console.log('Default settings saved to file.');
-    }
-} catch (error) {
-    console.error(`Error reading or processing settings from "${settingsFilePath}":`, error);
-}
-
-// Destructure the settings for use
-const { PREFIX, fbEnabled, unsplashEnabled, imgEnabled, ALLOW_GROUP_MESSAGES, ALLOW_PRIVATE_MESSAGES } = botSettings;
-
-// Log the loaded settings
-console.log(`Bot Settings Loaded:
-PREFIX = ${PREFIX},
-unsplashEnabled = ${unsplashEnabled},
-imgEnabled = ${imgEnabled},
-fbEnabled = ${fbEnabled},
-ALLOW_GROUP_MESSAGES = ${ALLOW_GROUP_MESSAGES},
-ALLOW_PRIVATE_MESSAGES = ${ALLOW_PRIVATE_MESSAGES}`);
-
-
-const menuRequests = new Map();
-const fbMessageRequests = new Map(); // Added for handling Facebook video requests
-
-
-// Create the 
-// Simulate an app process
-console.log("App started");
-
-// Call the restart function after 5 seconds (for demonstration)
- // 5 seconds delay before restart
 async function addReaction(sock, messageKey, reactionEmoji) {
     try {
         if (messageKey) {
@@ -452,9 +397,7 @@ async function restartBot(sock, sender) {
 
 
 
-
-
-    
+// බොට් ආරම්භ කිරීමේ විධානය
 async function startBot(sessionId) {
     console.log(`Starting bot for session: ${sessionId}...`);
 
@@ -462,12 +405,12 @@ async function startBot(sessionId) {
     const { state, saveCreds } = await useMultiFileAuthState(authStatePath);
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true,
+        printQRInTerminal: false, // Terminal එකේ QR කේතය නොපෙන්වන්න
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
         if (connection === 'close') {
@@ -478,7 +421,12 @@ async function startBot(sessionId) {
         }
 
         if (qr) {
-            console.log(`Session ${sessionId}: Scan this QR code with WhatsApp:`, qr);
+            console.log(`Session ${sessionId}: QR code generated.`);
+            try {
+                qrCodeURL = await qrcode.toDataURL(qr); // QR කේතය URL එකක් ලෙස පවත්වන්න
+            } catch (err) {
+                console.error(`Error generating QR code: ${err.message}`);
+            }
         }
 
         if (lastDisconnect?.error) {
@@ -595,7 +543,24 @@ async function startBot(sessionId) {
             console.error('Error handling message:', error);
         }
     });
-    
 }
 
+// Express සේවාදායකය QR කේතය පෙන්වීම සඳහා
+app.get('/', (req, res) => {
+    if (qrCodeURL) {
+        res.send(`
+            <h1>Scan this QR code to connect your WhatsApp:</h1>
+            <img src="${qrCodeURL}" alt="QR Code" />
+        `);
+    } else {
+        res.send('<h1>QR code not generated yet. Please wait...</h1>');
+    }
+});
+
+// Express සේවාදායකය ආරම්භ කරන්න
+app.listen(port, () => {
+    console.log(`QR code server is running at http://localhost:${port}`);
+});
+
+// බොට් ආරම්භ කරන්න
 startBot(sessionId);
