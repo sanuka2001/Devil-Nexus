@@ -12,6 +12,60 @@ const port = 8000; // සේවාදායකය ධාවනය වන පෝ�
 // QR කේත URL එක හඳුනාගැනීම සඳහා
 let qrCodeURL = ''; 
 
+const serviceName = process.env.SERVICE_NAME;
+
+console.log(`Detected service name: ${serviceName}`);
+const sessionId = 'session_001'; // Unique session ID for each instance
+const settingsFilePath = 'botSettings.json'; // Path to the settings file
+
+// Default bot settings
+let botSettings = {
+    PREFIX: '.',
+    unsplashEnabled: true,
+    imgEnabled: true,
+    fbEnabled: true,
+    ALLOW_GROUP_MESSAGES: true,
+    ALLOW_PRIVATE_MESSAGES: true,
+};
+
+// API Keys
+const unsplashapiKey = 'PDaZYHRrWOw5RNJ0O-1n0Xvp2S15-2bH8Ry72tBepGc'; // Replace with your Unsplash API key
+const googleapiKey = 'AIzaSyBznfHRtfx21rP85fWvqntUYCUiWzKfz64'; // Replace with your Google API key
+const cseId = 'f486bc06ae2564183'; // Custom Search Engine ID
+
+// Load settings from the file if it exists
+try {
+    if (fs.existsSync(settingsFilePath)) {
+        const data = fs.readFileSync(settingsFilePath, 'utf8');
+        botSettings = { ...botSettings, ...JSON.parse(data) }; // Merge default and loaded settings
+        console.log('Bot settings successfully loaded from file.');
+    } else {
+        console.warn(`Settings file "${settingsFilePath}" not found. Using default settings.`);
+        // Optionally, save the default settings to the file
+        fs.writeFileSync(settingsFilePath, JSON.stringify(botSettings, null, 4));
+        console.log('Default settings saved to file.');
+    }
+} catch (error) {
+    console.error(`Error reading or processing settings from "${settingsFilePath}":`, error);
+}
+
+// Destructure the settings for use
+const { PREFIX, fbEnabled, unsplashEnabled, imgEnabled, ALLOW_GROUP_MESSAGES, ALLOW_PRIVATE_MESSAGES } = botSettings;
+
+// Log the loaded settings
+console.log(`Bot Settings Loaded:
+PREFIX = ${PREFIX},
+unsplashEnabled = ${unsplashEnabled},
+imgEnabled = ${imgEnabled},
+fbEnabled = ${fbEnabled},
+ALLOW_GROUP_MESSAGES = ${ALLOW_GROUP_MESSAGES},
+ALLOW_PRIVATE_MESSAGES = ${ALLOW_PRIVATE_MESSAGES}`);
+
+
+const menuRequests = new Map();
+const fbMessageRequests = new Map(); // Added for handling Facebook video requests
+
+
 async function addReaction(sock, messageKey, reactionEmoji) {
     try {
         if (messageKey) {
