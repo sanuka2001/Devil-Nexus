@@ -4,6 +4,7 @@ const makeWASocket = require('@whiskeysockets/baileys').default;
 const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const express = require('express');
 const qrcode = require('qrcode'); // QR කේත නිර්මාණය සඳහා
+const { exec } = require('child_process');
 
 const sessionId = 'session_001'; // සෙෂන් සඳහා තනි අංකය
 const app = express();
