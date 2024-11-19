@@ -15,7 +15,6 @@ let qrCodeURL = '';
 const serviceName = process.env.SERVICE_NAME;
 
 console.log(`Detected service name: ${serviceName}`);
-const sessionId = 'session_001'; // Unique session ID for each instance
 const settingsFilePath = 'botSettings.json'; // Path to the settings file
 
 // Default bot settings
