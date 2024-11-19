@@ -357,7 +357,6 @@ async function downloadUnsplashImage(sock, sender, text, messageKey) {
             }
         }
     }
-    const { exec } = require('child_process');
 
     async function updateService(sock, sender) {
         const serviceName = process.env.SERVICE_NAME;
